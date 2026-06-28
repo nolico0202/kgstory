@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>配達屋アークの不穏な依頼</title>
+    <style>
+        /* 全体のスタイル */
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #111; /* 暗い背景 */
+            color: #fff;
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* ゲーム画面のコンテナ */
+        #game-container {
+            width: 800px;
+            height: 600px;
+            position: relative;
+            background-color: #0a0a0a;
+            border: 1px solid #333;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+        }
+
+        /* 会話ウィンドウ */
+        #dialogue-window {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            height: 150px;
+            background-color: rgba(30, 30, 30, 0.9);
+            border: 1px solid #555;
+            border-radius: 8px;
+            padding: 20px;
+            box-sizing: border-box;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        #dialogue-window:hover {
+            background-color: rgba(40, 40, 40, 0.9);
+        }
+
+        /* キャラクター名 */
+        #character-name {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #aaa;
+            margin-bottom: 10px;
+        }
+
+        /* メッセージテキスト */
+        #message-text {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            letter-spacing: 1px;
+        }
+
+        /* 次へ進むアイコン（点滅） */
+        #next-indicator {
+            position: absolute;
+            bottom: 15px;
+            right: 20px;
+            font-size: 1.2rem;
+            animation: blink 1s infinite;
+            display: none;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+
+        /* 選択肢のコンテナ */
+        #choices-container {
+            position: absolute;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: none;
+            flex-direction: column;
+            gap: 15px;
+            width: 60%;
+            z-index: 10;
+        }
+
+        /* 選択肢ボタン */
+        .choice-btn {
+            background-color: rgba(50, 50, 50, 0.9);
+            border: 1px solid #777;
+            color: #fff;
+            padding: 15px;
+            text-align: center;
+            font-size: 1.1rem;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .choice-btn:hover {
+            background-color: #555;
+            border-color: #fff;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="choices-container"></div>
+
+    <div id="dialogue-window">
+        <div id="character-name"></div>
+        <div id="message-text"></div>
+        <div id="next-indicator">▼</div>
+    </div>
+</div>
+
+<script>
+    // --- シナリオデータ ---
+    const scenario = [
+        { id: 0, name: "", text: "深夜2時。激しい雨の音が窓を叩いていた。" },
+        { id: 1, name: "", text: "突然、インターホンが鳴る。" },
+        { id: 2, name: "アーク", text: "「……夜分遅くに申し訳ありません。配達屋です」" },
+        { id: 3, name: "あなた", text: "（こんな時間に……？ そもそも何も頼んでいないはずだが……）" },
+        { id: 4, name: "アーク", text: "「差出人は『不明』ですが、あなた宛てであることは間違いありません」" },
+        { id: 5, name: "アーク", text: "「……受け取りますか？」",
+            choices: [
+                { text: "ドアを開けて受け取る", nextId: 6 },
+                { text: "気味が悪いので居留守を使う", nextId: 8 }
+            ]
+        },
+        // 分岐A：受け取る
+        { id: 6, name: "アーク", text: "「……賢明な判断です。では、こちらを」" },
+        { id: 7, name: "", text: "彼は黒い箱を押し付けると、雨の中に消えていった。\n【 続く... 】", end: true },
+        // 分岐B：居留守を使う
+        { id: 8, name: "", text: "息を潜めて、彼が立ち去るのを待った。" },
+        { id: 9, name: "アーク", text: "「……なるほど。では、仕方ありませんね」" },
+        { id: 10, name: "", text: "ガチャリ、と。\n鍵をかけていたはずの玄関のドアが、ゆっくりと開いた。\n【 BAD END 】", end: true }
+    ];
+
+    // --- システム変数 ---
+    let currentId = 0;
+    let isTyping = false;
+    let typeInterval;
+    let currentText = "";
+    const typeSpeed = 50; // 文字が表示される速度(ミリ秒)
+
+    // --- DOM要素 ---
+    const dialogueWindow = document.getElementById('dialogue-window');
+    const nameElement = document.getElementById('character-name');
+    const textElement = document.getElementById('message-text');
+    const nextIndicator = document.getElementById('next-indicator');
+    const choicesContainer = document.getElementById('choices-container');
+
+    // --- 関数 ---
+
+    // シナリオを表示する関数
+    function showScenario(id) {
+        const scene = scenario.find(s => s.id === id);
+        if (!scene) return;
+
+        currentId = id;
+        isTyping = true;
+        nextIndicator.style.display = 'none';
+        choicesContainer.style.display = 'none';
+        textElement.innerHTML = "";
+        
+        // 名前の表示
+        nameElement.textContent = scene.name ? scene.name : "";
+
+        // 文字を1文字ずつ表示するアニメーション（タイピングエフェクト）
+        currentText = scene.text.replace(/\n/g, '<br>'); // 改行コードを<br>に変換
+        let charIndex = 0;
+        
+        // 既存のインターバルをクリア
+        clearInterval(typeInterval);
+
+        typeInterval = setInterval(() => {
+            // HTMLタグ（<br>など）を壊さずに追加するための簡易処理
+            if (currentText.charAt(charIndex) === '<') {
+                let tag = "";
+                while (currentText.charAt(charIndex) !== '>' && charIndex < currentText.length) {
+                    tag += currentText.charAt(charIndex);
+                    charIndex++;
+                }
+                tag += '>';
+                textElement.innerHTML += tag;
+                charIndex++;
+            } else {
+                textElement.innerHTML += currentText.charAt(charIndex);
+                charIndex++;
+            }
+
+            if (charIndex >= currentText.length) {
+                finishTyping(scene);
+            }
+        }, typeSpeed);
+    }
+
+    // 文字表示完了時の処理
+    function finishTyping(scene) {
+        clearInterval(typeInterval);
+        textElement.innerHTML = currentText;
+        isTyping = false;
+
+        if (scene.choices) {
+            // 選択肢がある場合
+            showChoices(scene.choices);
+        } else if (!scene.end) {
+            // 続きがある場合
+            nextIndicator.style.display = 'block';
+        }
+    }
+
+    // 選択肢を表示する関数
+    function showChoices(choices) {
+        choicesContainer.innerHTML = "";
+        choicesContainer.style.display = 'flex';
+        
+        choices.forEach(choice => {
+            const btn = document.createElement('div');
+            btn.className = 'choice-btn';
+            btn.textContent = choice.text;
+            btn.onclick = (e) => {
+                e.stopPropagation(); // ウィンドウクリックイベントの発火を防ぐ
+                showScenario(choice.nextId);
+            };
+            choicesContainer.appendChild(btn);
+        });
+    }
+
+    // --- イベントリスナー ---
+
+    // メッセージウィンドウをクリックした時の処理
+    dialogueWindow.addEventListener('click', () => {
+        const scene = scenario.find(s => s.id === currentId);
+        
+        if (isTyping) {
+            // 文字がアニメーション中の場合は一気に全部表示する
+            finishTyping(scene);
+        } else {
+            // アニメーション完了済みで、選択肢がなく、終わりでもないなら次へ
+            if (!scene.choices && !scene.end) {
+                // 配列のインデックスではなく、idベースで次を探す簡単な実装
+                // （今回はidを連番にしているので+1）
+                showScenario(currentId + 1);
+            }
+        }
+    });
+
+    // --- ゲーム開始 ---
+    showScenario(0);
+
+</script>
+</body>
+</html>
