@@ -29,7 +29,7 @@ body {
     box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
 }
 
-/* セーブ・ロードボタンのスタイル（追加部分） */
+/* セーブ・ロードボタンのスタイル */
 #system-controls {
     position: absolute;
     top: 15px;
@@ -159,23 +159,23 @@ const scenario = [
     { id: 9, name: "アーク", text: "・・・！！！" },
     { id: 10, name: "アーク", text: "・・・！！！！！！！！！" },
     { id: 11, name: "アーク", text: "ちょっ・・・ちょっとまて！ちょっとまてまてまて！この型のロボットって冷却タンクついてたよな！" },
-    { id: 12, name: "", text: "目がかすんできて焦点が合わない・・・" },
+    { id: 12, name: "", text: "目がかすんできて焦点が合わない・・・" }, // ★修正箇所：カンマを追加しました
     { id: 13, name: "アーク", text: "「……夜分遅くに申し訳ありません。配達屋です」" },
     { id: 14, name: "あなた", text: "（こんな時間に……？ そもそも何も頼んでいないはずだが……）" },
     { id: 15, name: "アーク", text: "「差出人は『不明』ですが、あなた宛てであることは間違いありません」" },
     { id: 16, name: "アーク", text: "「……受け取りますか？」", 
       choices: [
-          { text: "ドアを開けて受け取る", nextId: 12 },
-          { text: "気味が悪いので居留守を使う", nextId: 14 }
+          { text: "ドアを開けて受け取る", nextId: 17 }, // ★修正箇所：分岐先のIDを変更
+          { text: "気味が悪いので居留守を使う", nextId: 19 } // ★修正箇所：分岐先のIDを変更
       ]
     },
-    // 分岐A：受け取る (※元コードのID被りを修正しました)
-    { id: 12, name: "アーク", text: "「……賢明な判断です。では、こちらを」" },
-    { id: 13, name: "", text: "彼は黒い箱を押し付けると、雨の中に消えていった。\n【 続く... 】", end: true },
-    // 分岐B：居留守を使う
-    { id: 14, name: "", text: "息を潜めて、彼が立ち去るのを待った。" },
-    { id: 15, name: "アーク", text: "「……なるほど。では、仕方ありませんね」" },
-    { id: 16, name: "", text: "ガチャリ、と。\n鍵をかけていたはずの玄関のドアが、ゆっくりと開いた。\n【 BAD END 】", end: true }
+    // 分岐A：受け取る (★修正箇所：IDの重複を解消するため連番に変更)
+    { id: 17, name: "アーク", text: "「……賢明な判断です。では、こちらを」" },
+    { id: 18, name: "", text: "彼は黒い箱を押し付けると、雨の中に消えていった。\n【 続く... 】", end: true },
+    // 分岐B：居留守を使う (★修正箇所：IDの重複を解消するため連番に変更)
+    { id: 19, name: "", text: "息を潜めて、彼が立ち去るのを待った。" },
+    { id: 20, name: "アーク", text: "「……なるほど。では、仕方ありませんね」" },
+    { id: 21, name: "", text: "ガチャリ、と。\n鍵をかけていたはずの玄関のドアが、ゆっくりと開いた。\n【 BAD END 】", end: true }
 ];
 
 // --- システム変数 ---
@@ -192,7 +192,7 @@ const textElement = document.getElementById('message-text');
 const nextIndicator = document.getElementById('next-indicator');
 const choicesContainer = document.getElementById('choices-container');
 
-// --- セーブ・ロード機能（追加部分） ---
+// --- セーブ・ロード機能 ---
 function saveGame() {
     localStorage.setItem('kgstory_saveData', currentId);
     alert('現在の進行状況をセーブしました。');
@@ -201,7 +201,7 @@ function saveGame() {
 function loadGame() {
     const savedId = localStorage.getItem('kgstory_saveData');
     if (savedId !== null) {
-        showScenario(parseInt(savedId, 10)); // 保存されたIDから再開
+        showScenario(parseInt(savedId, 10));
         alert('セーブデータをロードしました。');
     } else {
         alert('セーブデータがありません。');
@@ -223,15 +223,15 @@ function showScenario(id) {
     // 名前の表示
     nameElement.textContent = scene.name ? scene.name : "";
     
-    // 文字を1文字ずつ表示するアニメーション（タイピングエフェクト）
-    currentText = scene.text.replace(/\n/g, '<br>'); // 改行コードを<br>に変換
+    // 文字を1文字ずつ表示するアニメーション
+    currentText = scene.text.replace(/\n/g, '<br>');
     let charIndex = 0;
     
     // 既存のインターバルをクリア
     clearInterval(typeInterval);
     
     typeInterval = setInterval(() => {
-        // HTMLタグ（<br>など）を壊さずに追加するための簡易処理
+        // HTMLタグを壊さずに追加するための処理
         if (currentText.charAt(charIndex) === '<') {
             let tag = "";
             while (currentText.charAt(charIndex) !== '>' && charIndex < currentText.length) {
@@ -277,7 +277,7 @@ function showChoices(choices) {
         btn.className = 'choice-btn';
         btn.textContent = choice.text;
         btn.onclick = (e) => {
-            e.stopPropagation(); // ウィンドウクリックイベントの発火を防ぐ
+            e.stopPropagation();
             showScenario(choice.nextId);
         };
         choicesContainer.appendChild(btn);
@@ -290,13 +290,11 @@ dialogueWindow.addEventListener('click', () => {
     const scene = scenario.find(s => s.id === currentId);
     
     if (isTyping) {
-        // 文字がアニメーション中の場合は一気に全部表示する
+        // 文字がアニメーション中の場合は一気に全部表示
         finishTyping(scene);
     } else {
         // アニメーション完了済みで、選択肢がなく、終わりでもないなら次へ
         if (!scene.choices && !scene.end) {
-            // 配列のインデックスではなく、idベースで次を探す簡単な実装
-            // （今回はidを連番にしているので+1）
             showScenario(currentId + 1);
         }
     }
